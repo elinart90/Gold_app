@@ -1,0 +1,80 @@
+/* Add these to your existing login.css */
+
+/* Error States */
+.form-group.error input {
+  border-color: #e53e3e;
+}
+
+.form-group.error input:focus {
+  box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.2);
+}
+
+.error-message {
+  color: #e53e3e;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+/* Form Options */
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+}
+
+.remember-me input {
+  margin-right: 0.5rem;
+}
+
+.forgot-password {
+  color: #f8d56b;
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.forgot-password:hover {
+  text-decoration: underline;
+}
+
+/* Loading Spinner */
+.spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 0.5rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Google Button */
+.google-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: white;
+  color: #1a2b3c;
+  border: 1px solid #e2e8f0;
+}
+
+.google-button:hover {
+  background: #f7fafc;
+}
+
+.google-button img {
+  width: 18px;
+  height: 18px;
+}
