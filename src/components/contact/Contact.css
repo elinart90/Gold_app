@@ -94,3 +94,53 @@
     font-size: 2rem;
   }
 }
+
+
+/* Contact Icons */
+.contact-icon {
+  font-size: 1.5rem;
+  color: #f8d56b;
+  margin-bottom: 0.5rem;
+}
+
+/* WhatsApp Card */
+.whatsapp-card {
+  background-color: rgba(37, 211, 102, 0.1);
+  border: 1px solid rgba(37, 211, 102, 0.2);
+  transition: all 0.3s ease;
+}
+
+.whatsapp-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(37, 211, 102, 0.1);
+}
+
+.whatsapp-icon {
+  color: #25D366;
+}
+
+.whatsapp-card a {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .contact-info {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .contact-info {
+    grid-template-columns: 1fr;
+  }
+  
+  .whatsapp-card {
+    order: 1; /* Make WhatsApp appear first on mobile */
+  }
+}
