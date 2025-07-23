@@ -46,30 +46,43 @@ const GoldCalculator = () => {
       const priceToUse = customPrice || currentPrice;
       validateInput(priceToUse, "Price");
       
-      const calculatedUnits = parseFloat(weight) / 0.8;
-      const effectiveUnits = Math.floor(calculatedUnits * 100) / 100;
-      
-      const pounds = Math.floor(calculatedUnits);
-      const remainingAfterPounds = (calculatedUnits - pounds) * 10;
-      const blades = Math.floor(remainingAfterPounds);
-      const remainingAfterBlades = (remainingAfterPounds - blades) * 10;
-      const matches = Math.floor(remainingAfterBlades);
-      
-      const totalValue = effectiveUnits * parseFloat(priceToUse);
-      
+      // 1. Calculate raw value (weight / 0.8)
+      const rawValue = parseFloat(weight) / 0.8;
+
+      // 2. Format to XX.YZZ (5 digits total)
+      const formatted = rawValue.toLocaleString('en-US', {
+        minimumIntegerDigits: 2,
+        minimumFractionDigits: 3,
+        maximumFractionDigits: 3
+      }).replace(/,/g, '');
+
+      // 3. Extract digits by position
+      const pounds = parseInt(formatted[0]); // Tens place (Pounds)
+      const blades = parseInt(formatted[1]); // Units place (Blades)
+      const matches = parseInt(formatted[3]); // Tenths place (Matches)
+      // Digits at positions [4] and [5] are ignored
+
+      // 4. Calculate total matches (1 Pound = 100, 1 Blade = 10, 1 Match = 1)
+      const totalMatches = (pounds * 100) + (blades * 10) + matches;
+      const effectiveValue = totalMatches / 10; // For pricing calculation
+
+      // 5. Calculate total value
+      const totalValue = effectiveValue * parseFloat(priceToUse);
+
       const calculation = {
         pounds,
         blades,
         matches,
-        calculatedUnits: parseFloat(calculatedUnits.toFixed(3)),
-        effectiveUnits: parseFloat(effectiveUnits.toFixed(2)),
+        totalMatches,
+        effectiveValue: parseFloat(effectiveValue.toFixed(1)),
         totalValue,
+        rawValue: parseFloat(rawValue.toFixed(3)),
         weight: parseFloat(weight),
         price: priceToUse,
         timestamp: new Date(),
-        agentId
+        agentId,
       };
-      
+
       setResult(calculation);
       await saveCalculation(calculation);
       setError('');
@@ -117,7 +130,7 @@ const GoldCalculator = () => {
       >
         <FaCalculator className="header-icon" />
         <h2>Gold Value Calculator</h2>
-        <p>Calculate your gold's worth based on current market prices</p>
+        <p>Calculate using Pounds, Blades, and Matches</p>
         <button 
           onClick={toggleHistory}
           className="history-toggle"
@@ -159,7 +172,7 @@ const GoldCalculator = () => {
                     </div>
                     <div className="history-item-details">
                       <span>Value: {formatCurrency(calc.totalValue)}</span>
-                      <span>Units: {calc.effectiveUnits}</span>
+                      <span>Units: {calc.pounds}P {calc.blades}B {calc.matches}M</span>
                     </div>
                   </li>
                 ))}
@@ -256,15 +269,15 @@ const GoldCalculator = () => {
             <div className="calculation-breakdown">
               <div className="breakdown-step">
                 <span>Weight Calculation:</span>
-                <span>{weight}g ÷ 0.8 = {result.calculatedUnits.toFixed(3)} units</span>
+                <span>{weight}g ÷ 0.8 = {result.rawValue.toFixed(3)}</span>
               </div>
               <div className="breakdown-step">
-                <span>Effective Units:</span>
-                <span>{result.effectiveUnits.toFixed(2)} (0.005 ignored)</span>
+                <span>Digit Breakdown:</span>
+                <span>{result.pounds}P {result.blades}B {result.matches}M</span>
               </div>
               <div className="breakdown-step">
-                <span>Breakdown:</span>
-                <span>{result.pounds} pounds, {result.blades} blades, {result.matches} matches</span>
+                <span>Total Matches:</span>
+                <span>{result.totalMatches} (1P=100, 1B=10, 1M=1)</span>
               </div>
             </div>
             
@@ -277,6 +290,7 @@ const GoldCalculator = () => {
               >
                 <div className="result-label">Pounds</div>
                 <div className="result-value">{result.pounds}</div>
+                <small className="unit-note">×100 matches</small>
               </motion.div>
               
               <motion.div 
@@ -287,6 +301,7 @@ const GoldCalculator = () => {
               >
                 <div className="result-label">Blades</div>
                 <div className="result-value">{result.blades}</div>
+                <small className="unit-note">×10 matches</small>
               </motion.div>
               
               <motion.div 
@@ -297,7 +312,7 @@ const GoldCalculator = () => {
               >
                 <div className="result-label">Matches</div>
                 <div className="result-value">{result.matches}</div>
-                <small className="matches-note">(Not used in calculation)</small>
+                <small className="unit-note">×1 match</small>
               </motion.div>
               
               <motion.div 
@@ -306,8 +321,9 @@ const GoldCalculator = () => {
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.4 }}
               >
-                <div className="result-label">Effective Units</div>
-                <div className="result-value">{result.effectiveUnits.toFixed(2)}</div>
+                <div className="result-label">Effective Value</div>
+                <div className="result-value">{result.effectiveValue}</div>
+                <small className="unit-note">(Total matches ÷ 10)</small>
               </motion.div>
             </div>
             
@@ -322,7 +338,7 @@ const GoldCalculator = () => {
                 {formatCurrency(result.totalValue)}
               </div>
               <div className="calculation-note">
-                Calculated as: {result.effectiveUnits.toFixed(2)} × {formatCurrency(customPrice || currentPrice)}
+                Calculated as: {result.effectiveValue} × {formatCurrency(result.price)}
               </div>
             </motion.div>
           </motion.div>
