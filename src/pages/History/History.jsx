@@ -11,7 +11,7 @@ import {
   FaMoneyBillWave
 } from 'react-icons/fa';
 import { formatCurrency } from '../../utils/currencyFormatter';
-import { format, subDays, isWithinInterval, startOfDay, endOfDay, parseISO } from 'date-fns';
+import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db } from '../../services/firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
@@ -30,31 +30,28 @@ const TransactionHistory = () => {
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
   const [showFilters, setShowFilters] = useState(false);
   const [dateRange, setDateRange] = useState([
-    startOfDay(subDays(new Date(), 30)), // Default: last 30 days
+    startOfDay(subDays(new Date(), 30)),
     endOfDay(new Date())
   ]);
   const [startDate, endDate] = dateRange;
 
-  // Calculate totals whenever transactions or filters change
+  // Calculate totals
   useEffect(() => {
-    const fullTotal = transactions.reduce((sum, transaction) => sum + (transaction.totalValue || 0), 0);
+    const fullTotal = transactions.reduce((sum, t) => sum + (t.totalValue || 0), 0);
     setTotalSpent(fullTotal);
-    
-    const currentFilteredTotal = filteredTransactions.reduce((sum, transaction) => sum + (transaction.totalValue || 0), 0);
-    setFilteredTotal(currentFilteredTotal);
+    const filteredTotal = filteredTransactions.reduce((sum, t) => sum + (t.totalValue || 0), 0);
+    setFilteredTotal(filteredTotal);
   }, [transactions, filteredTransactions]);
 
-  // Fetch transactions from Firestore
+  // Fetch transactions
   useEffect(() => {
     if (!agentId) {
       setLoading(false);
-      setError("Agent ID not found. Please sign in again.");
+      setError("Please sign in to view history");
       return;
     }
 
     setLoading(true);
-    setError(null);
-
     const q = query(
       collection(db, "calculations"),
       where("agentId", "==", agentId),
@@ -62,66 +59,38 @@ const TransactionHistory = () => {
     );
 
     const unsubscribe = onSnapshot(q, 
-      (querySnapshot) => {
-        const transactionsData = [];
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          let timestamp;
-          
-          // Handle timestamp conversion
-          if (data.timestamp?.toDate) {
-            timestamp = data.timestamp.toDate();
-          } else if (data.timestamp?.seconds) {
-            timestamp = new Date(data.timestamp.seconds * 1000);
-          } else {
-            timestamp = new Date(data.timestamp);
-          }
-
-          transactionsData.push({ 
-            id: doc.id, 
-            ...data,
-            timestamp,
-            type: "calculation",
-            pricePerUnit: data.price
-          });
+      (snapshot) => {
+        const data = snapshot.docs.map(doc => {
+          const docData = doc.data();
+          return {
+            id: doc.id,
+            ...docData,
+            timestamp: docData.timestamp?.toDate?.() || 
+                      (docData.timestamp?.seconds ? new Date(docData.timestamp.seconds * 1000) : new Date())
+          };
         });
-        
-        setTransactions(transactionsData);
+        setTransactions(data);
         setLoading(false);
-        setLastRefreshed(new Date());
       },
-      (error) => {
-        console.error("Error fetching transactions:", error);
-        setError("Failed to load calculations. Please check your connection.");
+      (err) => {
+        console.error("Error:", err);
+        setError("Failed to load data");
         setLoading(false);
       }
     );
 
-    return () => unsubscribe();
+    return unsubscribe;
   }, [agentId]);
 
-  // Filter transactions by date range
+  // Filter transactions
   useEffect(() => {
     if (transactions.length > 0) {
-      const filtered = transactions.filter(transaction => {
-        if (!transaction.timestamp) return false;
-        
-        // Ensure we have a proper Date object
-        const transactionDate = transaction.timestamp instanceof Date ? 
-          transaction.timestamp : 
-          new Date(transaction.timestamp);
-          
-        // Compare dates without time components
-        const transactionDay = startOfDay(transactionDate);
-        const startDay = startOfDay(startDate);
-        const endDay = endOfDay(endDate);
-
-        return transactionDay >= startDay && transactionDay <= endDay;
+      const filtered = transactions.filter(t => {
+        if (!t.timestamp) return false;
+        const date = t.timestamp instanceof Date ? t.timestamp : new Date(t.timestamp);
+        return date >= startDate && date <= endDate;
       });
-      
       setFilteredTransactions(filtered);
-    } else {
-      setFilteredTransactions([]);
     }
   }, [transactions, startDate, endDate]);
 
@@ -133,16 +102,6 @@ const TransactionHistory = () => {
     setShowFilters(!showFilters);
   };
 
-  const formatTimestamp = (timestamp) => {
-    if (!timestamp) return 'Unknown date';
-    try {
-      const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
-      return format(date, 'PPpp');
-    } catch {
-      return 'Invalid date';
-    }
-  };
-
   const handleDateChange = (dates) => {
     const [start, end] = dates;
     setDateRange([
@@ -151,22 +110,18 @@ const TransactionHistory = () => {
     ]);
   };
 
-  const transactionVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { 
-      opacity: 1, 
-      y: 0,
-      transition: { duration: 0.3 }
-    },
-    exit: { opacity: 0, x: -50 }
+  const formatDate = (date) => {
+    try {
+      return format(date instanceof Date ? date : new Date(date), 'PPpp');
+    } catch {
+      return 'Invalid date';
+    }
   };
 
   if (!agentId) {
     return (
-      <div className="transaction-history">
-        <div className="error-message">
-          <FaExclamationTriangle /> Please sign in to view history
-        </div>
+      <div className="error-message">
+        <FaExclamationTriangle /> Please sign in to view history
       </div>
     );
   }
@@ -174,8 +129,8 @@ const TransactionHistory = () => {
   return (
     <div className="transaction-history">
       <div className="history-header">
-        <div className="header-title">
-          <FaHistory size={24} />
+        <div className="header-content">
+          <FaHistory className="header-icon" />
           <h2>Calculation History</h2>
           {agentName && (
             <div className="agent-info">
@@ -184,13 +139,17 @@ const TransactionHistory = () => {
           )}
         </div>
         
-        <div className="header-actions">
-          <button onClick={toggleFilters} className="filter-button">
+        <div className="header-controls">
+          <button 
+            onClick={toggleFilters}
+            className={`filter-btn ${showFilters ? 'active' : ''}`}
+            aria-expanded={showFilters}
+          >
             <FaFilter /> {showFilters ? 'Hide Filters' : 'Filter'}
           </button>
           <button 
             onClick={handleRefresh}
-            className="refresh-button"
+            className="refresh-btn"
             disabled={loading}
           >
             <FaSync className={loading ? 'spinning' : ''} />
@@ -199,60 +158,57 @@ const TransactionHistory = () => {
         </div>
       </div>
 
-      {/* Total Spending Summary */}
-      <div className="total-summary-container">
-        <div className="total-summary-card">
-          <FaMoneyBillWave className="summary-icon" />
-          <div className="summary-details">
-            <span className="summary-label">Total Spent (All Time)</span>
-            <span className="summary-amount">{formatCurrency(totalSpent)}</span>
-          </div>
-        </div>
-        
-        <div className="total-summary-card">
-          <FaMoneyBillWave className="summary-icon" />
-          <div className="summary-details">
-            <span className="summary-label">Total Spent (Filtered)</span>
-            <span className="summary-amount">{formatCurrency(filteredTotal)}</span>
-            <small className="date-range">
-              {format(startDate, 'MMM d, yyyy')} - {format(endDate, 'MMM d, yyyy')}
-            </small>
-          </div>
-        </div>
-      </div>
-
       <AnimatePresence>
         {showFilters && (
-          <motion.div 
-            className="date-filter-container"
+          <motion.div
+            className="filter-container"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <div className="date-range-picker">
-              <DatePicker
-                selectsRange
-                startDate={startDate}
-                endDate={endDate}
-                onChange={handleDateChange}
-                maxDate={new Date()}
-                isClearable
-                placeholderText="Select date range"
-                className="date-range-input"
-                dateFormat="MMMM d, yyyy"
-              />
-            </div>
+            <DatePicker
+              selectsRange
+              startDate={startDate}
+              endDate={endDate}
+              onChange={handleDateChange}
+              maxDate={new Date()}
+              className="date-picker"
+              placeholderText="Select date range"
+              dateFormat="MMMM d, yyyy"
+              withPortal
+            />
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="last-refreshed">
-        Last updated: {format(lastRefreshed, 'PPpp')}
-        {loading && ' (Loading...)'}
+      <div className="summary-cards">
+        <div className="summary-card total-card">
+          <FaMoneyBillWave />
+          <div>
+            <h3>Total Spent</h3>
+            <p>{formatCurrency(totalSpent)}</p>
+          </div>
+        </div>
+        
+        <div className="summary-card filtered-card">
+          <FaMoneyBillWave />
+          <div>
+            <h3>Filtered Total</h3>
+            <p>{formatCurrency(filteredTotal)}</p>
+            <small>
+              {format(startDate, 'MMM d')} - {format(endDate, 'MMM d, yyyy')}
+            </small>
+          </div>
+        </div>
+      </div>
+
+      <div className="status-bar">
+        <span>Last updated: {format(lastRefreshed, 'PPpp')}</span>
+        {loading && <span className="loading-text">Loading...</span>}
         {filteredTransactions.length > 0 && (
           <span className="results-count">
-            Showing {filteredTransactions.length} of {transactions.length} records
+            Showing {filteredTransactions.length} of {transactions.length}
           </span>
         )}
       </div>
@@ -264,71 +220,61 @@ const TransactionHistory = () => {
       )}
 
       {loading ? (
-        <div className="loading-container">
-          <p>Loading calculations...</p>
+        <div className="loading-state">
+          <p>Loading transactions...</p>
         </div>
       ) : filteredTransactions.length === 0 ? (
         <div className="empty-state">
-          <p>No calculations found for selected date range</p>
+          <p>No transactions found</p>
           {transactions.length > 0 && (
             <button 
               onClick={() => setDateRange([
                 startOfDay(subDays(new Date(), 365)),
                 endOfDay(new Date())
               ])}
-              className="show-all-button"
+              className="show-all-btn"
             >
-              Show All Transactions
+              Show All
             </button>
           )}
         </div>
       ) : (
-        <div className="transactions-list">
-          <AnimatePresence>
-            {filteredTransactions.map((transaction) => (
-              <motion.div
-                key={transaction.id}
-                className="transaction-card"
-                variants={transactionVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                layout
-              >
-                <div className="transaction-icon">
-                  <FaCoins />
+        <div className="transactions-grid">
+          {filteredTransactions.map(transaction => (
+            <motion.div
+              key={transaction.id}
+              className="transaction-card"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="card-header">
+                <FaCoins className="transaction-icon" />
+                <span className="transaction-date">
+                  <FaCalendarAlt /> {formatDate(transaction.timestamp)}
+                </span>
+              </div>
+              
+              <div className="transaction-details">
+                <div className="detail-row">
+                  <span>Weight:</span>
+                  <span>{transaction.weight}g</span>
                 </div>
-                <div className="transaction-details">
-                  <div className="transaction-meta">
-                    <span className="transaction-type calculation">
-                      Gold Calculation
-                    </span>
-                    <span className="transaction-date">
-                      <FaCalendarAlt /> {formatTimestamp(transaction.timestamp)}
-                    </span>
-                  </div>
-                  <div className="transaction-amount">
-                    <div>
-                      <span className="label">Weight:</span>
-                      <span>{transaction.weight}g</span>
-                    </div>
-                    <div>
-                      <span className="label">Price:</span>
-                      <span>{formatCurrency(transaction.pricePerUnit)}/unit</span>
-                    </div>
-                    <div>
-                      <span className="label">Units:</span>
-                      <span>{transaction.effectiveUnits}</span>
-                    </div>
-                    <div className="total-amount">
-                      <span className="label">Total:</span>
-                      <span>{formatCurrency(transaction.totalValue)}</span>
-                    </div>
-                  </div>
+                <div className="detail-row">
+                  <span>Price:</span>
+                  <span>{formatCurrency(transaction.pricePerUnit)}/unit</span>
                 </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
+                <div className="detail-row">
+                  <span>Units:</span>
+                  <span>{transaction.effectiveUnits}</span>
+                </div>
+                <div className="detail-row total-row">
+                  <span>Total:</span>
+                  <span>{formatCurrency(transaction.totalValue)}</span>
+                </div>
+              </div>
+            </motion.div>
+          ))}
         </div>
       )}
     </div>
