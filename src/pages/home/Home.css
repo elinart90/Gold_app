@@ -9,7 +9,7 @@
   background-color: #f9f9f9;
 }
 
-/* Header Styles */
+/* Header Styles */  
 .home-header {
   background-color: #1a2b3c;
   color: white;
@@ -36,6 +36,10 @@
 .home-nav {
   display: flex;
   gap: 1.5rem;
+}
+
+.home-nav > link{
+  color: #f9f9f9;
 }
 
 .nav-link {
