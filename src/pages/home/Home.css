@@ -38,12 +38,9 @@
   gap: 1.5rem;
 }
 
-.home-nav > link{
-  color: #f9f9f9;
-}
 
 .nav-link {
-  color: white;
+  color: white !important;
   text-decoration: none;
   font-weight: 500;
   transition: color 0.3s;
