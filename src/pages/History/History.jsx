@@ -29,6 +29,9 @@ const TransactionHistory = () => {
   const [error, setError] = useState(null);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
   const [showFilters, setShowFilters] = useState(false);
+  // Initialize start and end dates carefully. subDays(new Date(), 30) gives you
+  // exactly 30 days ago at the current time. Using startOfDay and endOfDay
+  // makes the date ranges inclusive of the full days.
   const [startDate, setStartDate] = useState(startOfDay(subDays(new Date(), 30)));
   const [endDate, setEndDate] = useState(endOfDay(new Date()));
   const [isExporting, setIsExporting] = useState(false);
@@ -45,7 +48,10 @@ const TransactionHistory = () => {
 
   const formatDateRange = (start, end) => {
     if (!start || !end) return 'Invalid range';
-    if (start.getTime() === end.getTime()) return format(start, 'MMMM d, yyyy');
+    // Check if start and end dates are the same day (ignoring time)
+    if (startOfDay(start).getTime() === startOfDay(end).getTime()) {
+      return format(start, 'MMMM d, yyyy');
+    }
     if (start.getFullYear() === end.getFullYear()) {
       return `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`;
     }
@@ -63,34 +69,42 @@ const TransactionHistory = () => {
     setError(null);
 
     try {
+      // Construct the Firestore query with date range filters
       const q = query(
         collection(db, 'calculations'),
         where('agentId', '==', agentId),
-        orderBy('timestamp', 'desc')
+        // Add date range filters directly to the query
+        where('timestamp', '>=', startDate),
+        where('timestamp', '<=', endDate),
+        orderBy('timestamp', 'desc') // Order by timestamp after filtering
       );
 
       const snapshot = await getDocs(q);
 
       const transactionsData = snapshot.docs.map((doc) => {
         const data = doc.data();
-        const timestamp = data.timestamp?.toDate?.() || 
-                        new Date(data.timestamp?.seconds * 1000 || Date.now());
+        // Ensure timestamp is a proper Date object
+        const timestamp = data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp?.seconds * 1000 || Date.now());
 
         return {
           id: doc.id,
           ...data,
           timestamp,
           weight: data.weight || 0,
-          price: data.price || 0,
+          // Convert price to a number if it's stored as a string
+          price: parseFloat(data.price) || 0, 
           totalValue: data.totalValue || 0,
           pounds: data.pounds || 0,
           blades: data.blades || 0,
           matches: data.matches || 0
         };
-      }).filter(transaction => 
-        isAfter(transaction.timestamp, startDate) && 
-        isBefore(transaction.timestamp, endDate))
-        .sort((a, b) => b.timestamp - a.timestamp);
+      });
+      // The client-side filter and sort are no longer needed here
+      // because Firestore has already filtered and sorted the data.
+      // .filter(transaction => 
+      //   isAfter(transaction.timestamp, startDate) && 
+      //   isBefore(transaction.timestamp, endDate))
+      // .sort((a, b) => b.timestamp - a.timestamp);
 
       const total = transactionsData.reduce((sum, t) => sum + (t.totalValue || 0), 0);
 
@@ -99,11 +113,16 @@ const TransactionHistory = () => {
       setLastRefreshed(new Date());
     } catch (err) {
       console.error('Error fetching transactions:', err);
-      setError(`Failed to load calculations: ${err.message}`);
+      // More user-friendly error message if it's a Firestore error
+      if (err.code === 'failed-precondition' && err.message.includes('The query requires an index')) {
+          setError(`Failed to load calculations. Please ensure the necessary Firestore index is created. Details: ${err.message}`);
+      } else {
+          setError(`Failed to load calculations: ${err.message}`);
+      }
     } finally {
       setLoading(false);
     }
-  }, [agentId, startDate, endDate]);
+  }, [agentId, startDate, endDate]); // Dependencies remain the same
 
   useEffect(() => {
     fetchTransactions();
@@ -115,7 +134,7 @@ const TransactionHistory = () => {
       const dataToExport = transactions.map(transaction => ({
         'Date': format(transaction.timestamp, 'PPpp'),
         'Weight (g)': transaction.weight,
-        'Price': transaction.price,
+        'Price': transaction.price, // Keep as is or format as string for Excel
         'Total Value': transaction.totalValue,
         'Pounds': transaction.pounds,
         'Blades': transaction.blades,
@@ -142,16 +161,20 @@ const TransactionHistory = () => {
   const toggleFilters = () => setShowFilters((prev) => !prev);
 
   const handleStartDateChange = (date) => {
+    // Ensure date is valid and is at the start of the day
     const newDate = date ? startOfDay(date) : startOfDay(subDays(new Date(), 30));
     setStartDate(newDate);
+    // Adjust endDate if it becomes before new startDate
     if (isAfter(newDate, endDate)) {
       setEndDate(endOfDay(newDate));
     }
   };
 
   const handleEndDateChange = (date) => {
+    // Ensure date is valid and is at the end of the day
     const newDate = date ? endOfDay(date) : endOfDay(new Date());
     setEndDate(newDate);
+    // Adjust startDate if it becomes after new endDate
     if (isBefore(newDate, startDate)) {
       setStartDate(startOfDay(newDate));
     }
@@ -159,7 +182,10 @@ const TransactionHistory = () => {
 
   const formatTimestamp = (timestamp) => {
     try {
+      // Ensure timestamp is a Date object before formatting
       const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+      // Use current locale for formatting for better user experience
+      // Alternatively, keep 'dd/MM/yyyy, HH:mm:ss' if that's a strict requirement.
       return format(date, 'dd/MM/yyyy, HH:mm:ss');
     } catch {
       return 'Invalid date';
@@ -167,7 +193,9 @@ const TransactionHistory = () => {
   };
 
   const formatCalculationDisplay = (transaction) => {
-    return `${transaction.weight}g @ GHS ${transaction.price.toFixed(2)}\n${formatTimestamp(transaction.timestamp)}\nValue: GHS ${formatCurrency(transaction.totalValue)}\nUnits: ${transaction.pounds}P ${transaction.blades}B ${transaction.matches}M`;
+    // Ensure price is treated as a number for toFixed
+    const formattedPrice = parseFloat(transaction.price).toFixed(2);
+    return `${transaction.weight}g @ GHS ${formattedPrice}\n${formatTimestamp(transaction.timestamp)}\nValue: GHS ${formatCurrency(transaction.totalValue)}\nUnits: ${transaction.pounds}P ${transaction.blades}B ${transaction.matches}M`;
   };
 
   if (!agentId) {
@@ -207,7 +235,7 @@ const TransactionHistory = () => {
           <button 
             onClick={exportToExcel}
             className="export-button"
-            disabled={transactions.length === 0 || loading}
+            disabled={transactions.length === 0 || loading || isExporting} // Disable export during export
           >
             <FaFileExcel className={isExporting ? 'spinning' : ''} /> Export
           </button>
@@ -296,6 +324,7 @@ const TransactionHistory = () => {
           <p>No calculations found for selected date range</p>
           <button
             onClick={() => {
+              // Set a wider range for "Show Last Year's Transactions"
               setStartDate(startOfDay(subDays(new Date(), 365)));
               setEndDate(endOfDay(new Date()));
             }}
