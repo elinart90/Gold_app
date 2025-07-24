@@ -63,7 +63,6 @@ const TransactionHistory = () => {
     setError(null);
 
     try {
-      // Query all transactions for the agent (without date filter)
       const q = query(
         collection(db, 'calculations'),
         where('agentId', '==', agentId),
@@ -72,31 +71,38 @@ const TransactionHistory = () => {
 
       const snapshot = await getDocs(q);
 
-      // Process and filter client-side
-      const transactionsData = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        const timestamp = data.timestamp?.toDate?.() || 
-                        new Date(data.timestamp?.seconds * 1000 || Date.now());
+      if (snapshot.empty) {
+        setTransactions([]);
+        setTotalSpent(0);
+        setLastRefreshed(new Date());
+        return;
+      }
 
-        return {
-          id: doc.id,
-          ...data,
-          timestamp,
-          type: 'calculation',
-          pricePerUnit: data.price,
-          weight: data.weight || 0,
-          totalValue: data.totalValue || 0,
-          effectiveUnits: data.effectiveValue || 0, // Using effectiveValue from your data
-          blades: data.blades || 0,
-          matches: data.matches || 0,
-          pounds: data.pounds || 0,
-          rawValue: data.rawValue || 0,
-          totalMatches: data.totalMatches || 0
-        };
-      }).filter(transaction => 
-        isAfter(transaction.timestamp, startDate) && 
-        isBefore(transaction.timestamp, endDate)
-      );
+      const transactionsData = snapshot.docs
+        .map((doc) => {
+          const data = doc.data();
+          const timestamp = data.timestamp?.toDate?.() || 
+                          new Date(data.timestamp?.seconds * 1000 || Date.now());
+
+          return {
+            id: doc.id,
+            ...data,
+            timestamp,
+            type: 'calculation',
+            pricePerUnit: data.price,
+            weight: data.weight || 0,
+            totalValue: data.totalValue || 0,
+            effectiveUnits: data.effectiveValue || 0,
+            blades: data.blades || 0,
+            matches: data.matches || 0,
+            pounds: data.pounds || 0,
+            rawValue: data.rawValue || 0,
+            totalMatches: data.totalMatches || 0
+          };
+        })
+        .filter(transaction => 
+          isAfter(transaction.timestamp, startDate) && 
+          isBefore(transaction.timestamp, endDate));
 
       const total = transactionsData.reduce((sum, t) => sum + (t.totalValue || 0), 0);
 
@@ -105,7 +111,14 @@ const TransactionHistory = () => {
       setLastRefreshed(new Date());
     } catch (err) {
       console.error('Error fetching transactions:', err);
-      setError(`Failed to load calculations: ${err.message}`);
+      if (err.message.includes('index')) {
+        setError(
+          'Query requires an index. This should be created automatically. ' +
+          'If the problem persists, please contact support.'
+        );
+      } else {
+        setError(`Failed to load calculations: ${err.message}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -142,7 +155,25 @@ const TransactionHistory = () => {
   };
 
   useEffect(() => {
-    fetchTransactions();
+    let isMounted = true;
+    
+    const fetchData = async () => {
+      try {
+        await fetchTransactions();
+      } catch (err) {
+        if (isMounted) {
+          console.error('Fetch error:', err);
+          setError(`Failed to load data: ${err.message}`);
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      isMounted = false;
+    };
   }, [agentId, startDate, endDate]);
 
   const handleRefresh = () => {
@@ -169,11 +200,16 @@ const TransactionHistory = () => {
 
   const formatTimestamp = (timestamp) => {
     try {
-      const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+      const date = timestamp instanceof Date ? timestamp : timestamp?.toDate?.() || new Date(timestamp);
       return format(date, 'PPpp');
     } catch {
       return 'Invalid date';
     }
+  };
+
+  const handleRetry = () => {
+    setError(null);
+    fetchTransactions();
   };
 
   if (!agentId) {
@@ -286,14 +322,26 @@ const TransactionHistory = () => {
       {error && (
         <div className="error-message">
           <FaExclamationTriangle /> {error}
-          <button onClick={fetchTransactions} className="retry-button">
+          <button onClick={handleRetry} className="retry-button">
             Retry
           </button>
+          {error.includes('index') && (
+            <div className="index-help">
+              <p>Firestore needs to create an index for this query. This usually takes a few minutes.</p>
+              <p>You can also <a 
+                href="https://console.firebase.google.com/v1/r/project/gold-1c3b8/firestore/indexes?create_composite=Ck9wcm9qZWN0cy9nb2xkLTFjM2I4L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9jYWxjdWxhdGlvbnMvaW5kZXhlcy9fEAEaCwoHYWdlbnRJZBABGg0KCXRpbWVzdGFtcBACGgwKCF9fbmFtZV9fEAI" 
+                target="_blank" 
+                rel="noopener noreferrer">
+                click here to create the index manually
+              </a>.</p>
+            </div>
+          )}
         </div>
       )}
 
       {loading ? (
         <div className="loading-container">
+          <div className="loading-spinner"></div>
           <p>Loading calculations...</p>
         </div>
       ) : transactions.length === 0 ? (
