@@ -411,13 +411,14 @@
 
 .transaction-amount {
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 0.5rem;
 }
 
 .transaction-amount > div {
   display: flex;
   justify-content: space-between;
-  transition: transform var(--transition-fast);
+  min-width: 160px;
 }
 
 .transaction-card:hover .transaction-amount > div {
@@ -484,7 +485,7 @@
 /* Responsive Styles */
 @media (max-width: 768px) {
   .transactions-list {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
   }
 
   .history-header {
@@ -507,6 +508,14 @@
   .transaction-history {
     padding: 1rem;
     animation: none;
+  }
+
+  .transaction-amount {
+    grid-template-columns: 1fr;
+  }
+  
+  .transaction-amount > div {
+    min-width: 100%;
   }
 
   .transaction-card {

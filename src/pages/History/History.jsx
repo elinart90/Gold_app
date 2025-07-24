@@ -63,6 +63,7 @@ const TransactionHistory = () => {
     setError(null);
 
     try {
+      // Query all transactions for the agent (without date filter)
       const q = query(
         collection(db, 'calculations'),
         where('agentId', '==', agentId),
@@ -71,31 +72,31 @@ const TransactionHistory = () => {
 
       const snapshot = await getDocs(q);
 
-      const transactionsData = snapshot.docs
-        .map((doc) => {
-          const data = doc.data();
-          const timestamp = data.timestamp?.toDate?.() || 
-                          new Date(data.timestamp?.seconds * 1000 || Date.now());
+      // Process and filter client-side
+      const transactionsData = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        const timestamp = data.timestamp?.toDate?.() || 
+                        new Date(data.timestamp?.seconds * 1000 || Date.now());
 
-          return {
-            id: doc.id,
-            ...data,
-            timestamp,
-            type: 'calculation',
-            pricePerUnit: data.price,
-            weight: data.weight || 0,
-            totalValue: data.totalValue || 0,
-            effectiveUnits: data.effectiveUnits || 0,
-            blades: data.blades || 0,
-            matches: data.matches || 0,
-            pounds: data.pounds || 0,
-            rawValue: data.rawValue || 0
-          };
-        })
-        .filter(transaction => 
-          isAfter(transaction.timestamp, startDate) && 
-          isBefore(transaction.timestamp, endDate)
-        );
+        return {
+          id: doc.id,
+          ...data,
+          timestamp,
+          type: 'calculation',
+          pricePerUnit: data.price,
+          weight: data.weight || 0,
+          totalValue: data.totalValue || 0,
+          effectiveUnits: data.effectiveValue || 0, // Using effectiveValue from your data
+          blades: data.blades || 0,
+          matches: data.matches || 0,
+          pounds: data.pounds || 0,
+          rawValue: data.rawValue || 0,
+          totalMatches: data.totalMatches || 0
+        };
+      }).filter(transaction => 
+        isAfter(transaction.timestamp, startDate) && 
+        isBefore(transaction.timestamp, endDate)
+      );
 
       const total = transactionsData.reduce((sum, t) => sum + (t.totalValue || 0), 0);
 
@@ -115,15 +116,16 @@ const TransactionHistory = () => {
     try {
       const dataToExport = transactions.map(transaction => ({
         'Date': format(transaction.timestamp, 'PPpp'),
-        'Transaction Type': 'Gold Calculation',
+        'Type': 'Gold Calculation',
         'Weight (g)': transaction.weight,
-        'Price per Unit': `$${parseFloat(transaction.pricePerUnit).toFixed(2)}`,
-        'Units': transaction.effectiveUnits,
+        'Price': transaction.pricePerUnit,
+        'Effective Units': transaction.effectiveUnits,
         'Blades': transaction.blades,
         'Matches': transaction.matches,
+        'Total Matches': transaction.totalMatches,
         'Pounds': transaction.pounds,
-        'Raw Value': transaction.rawValue.toFixed(4),
-        'Total Value': formatCurrency(transaction.totalValue),
+        'Raw Value': transaction.rawValue,
+        'Total Value': transaction.totalValue,
         'Agent': agentName
       }));
 
@@ -341,7 +343,7 @@ const TransactionHistory = () => {
                       <span>{formatCurrency(transaction.pricePerUnit)}/unit</span>
                     </div>
                     <div>
-                      <span className="label">Units:</span>
+                      <span className="label">Effective Units:</span>
                       <span>{transaction.effectiveUnits}</span>
                     </div>
                     <div>
@@ -352,8 +354,20 @@ const TransactionHistory = () => {
                       <span className="label">Matches:</span>
                       <span>{transaction.matches}</span>
                     </div>
+                    <div>
+                      <span className="label">Total Matches:</span>
+                      <span>{transaction.totalMatches}</span>
+                    </div>
+                    <div>
+                      <span className="label">Pounds:</span>
+                      <span>{transaction.pounds}</span>
+                    </div>
+                    <div>
+                      <span className="label">Raw Value:</span>
+                      <span>{transaction.rawValue}</span>
+                    </div>
                     <div className="total-amount">
-                      <span className="label">Total:</span>
+                      <span className="label">Total Value:</span>
                       <span>{formatCurrency(transaction.totalValue)}</span>
                     </div>
                   </div>
