@@ -18,7 +18,7 @@ import { db } from '../../services/firebase';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import DatePicker from 'react-datepicker';
 import * as XLSX from 'xlsx';
-import 'react-datepicker/dist/reactdatepicker.css';
+import 'react-datepicker/dist/react-datepicker.css';
 import './History.css';
 
 const TransactionHistory = () => {
