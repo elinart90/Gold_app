@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useGoldPrice } from '../../contexts/GoldPriceContext';
 import {
   FaHistory,
@@ -18,7 +18,7 @@ import { db } from '../../services/firebase';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import DatePicker from 'react-datepicker';
 import * as XLSX from 'xlsx';
-import 'react-datepicker/dist/react-datepicker.css';
+import 'react-datepicker/dist/reactdatepicker.css';
 import './History.css';
 
 const TransactionHistory = () => {
@@ -52,7 +52,7 @@ const TransactionHistory = () => {
     return `${format(start, 'MMM d, yyyy')} - ${format(end, 'MMM d, yyyy')}`;
   };
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     if (!agentId) {
       setLoading(false);
       setError('Please sign in to view history');
@@ -71,38 +71,26 @@ const TransactionHistory = () => {
 
       const snapshot = await getDocs(q);
 
-      if (snapshot.empty) {
-        setTransactions([]);
-        setTotalSpent(0);
-        setLastRefreshed(new Date());
-        return;
-      }
+      const transactionsData = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        const timestamp = data.timestamp?.toDate?.() || 
+                        new Date(data.timestamp?.seconds * 1000 || Date.now());
 
-      const transactionsData = snapshot.docs
-        .map((doc) => {
-          const data = doc.data();
-          const timestamp = data.timestamp?.toDate?.() || 
-                          new Date(data.timestamp?.seconds * 1000 || Date.now());
-
-          return {
-            id: doc.id,
-            ...data,
-            timestamp,
-            type: 'calculation',
-            pricePerUnit: data.price,
-            weight: data.weight || 0,
-            totalValue: data.totalValue || 0,
-            effectiveUnits: data.effectiveValue || 0,
-            blades: data.blades || 0,
-            matches: data.matches || 0,
-            pounds: data.pounds || 0,
-            rawValue: data.rawValue || 0,
-            totalMatches: data.totalMatches || 0
-          };
-        })
-        .filter(transaction => 
-          isAfter(transaction.timestamp, startDate) && 
-          isBefore(transaction.timestamp, endDate));
+        return {
+          id: doc.id,
+          ...data,
+          timestamp,
+          weight: data.weight || 0,
+          price: data.price || 0,
+          totalValue: data.totalValue || 0,
+          pounds: data.pounds || 0,
+          blades: data.blades || 0,
+          matches: data.matches || 0
+        };
+      }).filter(transaction => 
+        isAfter(transaction.timestamp, startDate) && 
+        isBefore(transaction.timestamp, endDate))
+        .sort((a, b) => b.timestamp - a.timestamp);
 
       const total = transactionsData.reduce((sum, t) => sum + (t.totalValue || 0), 0);
 
@@ -111,34 +99,27 @@ const TransactionHistory = () => {
       setLastRefreshed(new Date());
     } catch (err) {
       console.error('Error fetching transactions:', err);
-      if (err.message.includes('index')) {
-        setError(
-          'Query requires an index. This should be created automatically. ' +
-          'If the problem persists, please contact support.'
-        );
-      } else {
-        setError(`Failed to load calculations: ${err.message}`);
-      }
+      setError(`Failed to load calculations: ${err.message}`);
     } finally {
       setLoading(false);
     }
-  };
+  }, [agentId, startDate, endDate]);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
 
   const exportToExcel = () => {
     setIsExporting(true);
     try {
       const dataToExport = transactions.map(transaction => ({
         'Date': format(transaction.timestamp, 'PPpp'),
-        'Type': 'Gold Calculation',
         'Weight (g)': transaction.weight,
-        'Price': transaction.pricePerUnit,
-        'Effective Units': transaction.effectiveUnits,
+        'Price': transaction.price,
+        'Total Value': transaction.totalValue,
+        'Pounds': transaction.pounds,
         'Blades': transaction.blades,
         'Matches': transaction.matches,
-        'Total Matches': transaction.totalMatches,
-        'Pounds': transaction.pounds,
-        'Raw Value': transaction.rawValue,
-        'Total Value': transaction.totalValue,
         'Agent': agentName
       }));
 
@@ -153,28 +134,6 @@ const TransactionHistory = () => {
       setIsExporting(false);
     }
   };
-
-  useEffect(() => {
-    let isMounted = true;
-    
-    const fetchData = async () => {
-      try {
-        await fetchTransactions();
-      } catch (err) {
-        if (isMounted) {
-          console.error('Fetch error:', err);
-          setError(`Failed to load data: ${err.message}`);
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [agentId, startDate, endDate]);
 
   const handleRefresh = () => {
     fetchTransactions();
@@ -200,16 +159,15 @@ const TransactionHistory = () => {
 
   const formatTimestamp = (timestamp) => {
     try {
-      const date = timestamp instanceof Date ? timestamp : timestamp?.toDate?.() || new Date(timestamp);
-      return format(date, 'PPpp');
+      const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+      return format(date, 'dd/MM/yyyy, HH:mm:ss');
     } catch {
       return 'Invalid date';
     }
   };
 
-  const handleRetry = () => {
-    setError(null);
-    fetchTransactions();
+  const formatCalculationDisplay = (transaction) => {
+    return `${transaction.weight}g @ GHS ${transaction.price.toFixed(2)}\n${formatTimestamp(transaction.timestamp)}\nValue: GHS ${formatCurrency(transaction.totalValue)}\nUnits: ${transaction.pounds}P ${transaction.blades}B ${transaction.matches}M`;
   };
 
   if (!agentId) {
@@ -322,20 +280,9 @@ const TransactionHistory = () => {
       {error && (
         <div className="error-message">
           <FaExclamationTriangle /> {error}
-          <button onClick={handleRetry} className="retry-button">
+          <button onClick={fetchTransactions} className="retry-button">
             Retry
           </button>
-          {error.includes('index') && (
-            <div className="index-help">
-              <p>Firestore needs to create an index for this query. This usually takes a few minutes.</p>
-              <p>You can also <a 
-                href="https://console.firebase.google.com/v1/r/project/gold-1c3b8/firestore/indexes?create_composite=Ck9wcm9qZWN0cy9nb2xkLTFjM2I4L2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9jYWxjdWxhdGlvbnMvaW5kZXhlcy9fEAEaCwoHYWdlbnRJZBABGg0KCXRpbWVzdGFtcBACGgwKCF9fbmFtZV9fEAI" 
-                target="_blank" 
-                rel="noopener noreferrer">
-                click here to create the index manually
-              </a>.</p>
-            </div>
-          )}
         </div>
       )}
 
@@ -376,48 +323,13 @@ const TransactionHistory = () => {
                 </div>
                 <div className="transaction-details">
                   <div className="transaction-meta">
-                    <span className="transaction-type calculation">Gold Calculation</span>
+                    <span className="transaction-type">Gold Calculation</span>
                     <span className="transaction-date">
                       <FaCalendarAlt /> {formatTimestamp(transaction.timestamp)}
                     </span>
                   </div>
-                  <div className="transaction-amount">
-                    <div>
-                      <span className="label">Weight:</span>
-                      <span>{transaction.weight}g</span>
-                    </div>
-                    <div>
-                      <span className="label">Price:</span>
-                      <span>{formatCurrency(transaction.pricePerUnit)}/unit</span>
-                    </div>
-                    <div>
-                      <span className="label">Effective Units:</span>
-                      <span>{transaction.effectiveUnits}</span>
-                    </div>
-                    <div>
-                      <span className="label">Blades:</span>
-                      <span>{transaction.blades}</span>
-                    </div>
-                    <div>
-                      <span className="label">Matches:</span>
-                      <span>{transaction.matches}</span>
-                    </div>
-                    <div>
-                      <span className="label">Total Matches:</span>
-                      <span>{transaction.totalMatches}</span>
-                    </div>
-                    <div>
-                      <span className="label">Pounds:</span>
-                      <span>{transaction.pounds}</span>
-                    </div>
-                    <div>
-                      <span className="label">Raw Value:</span>
-                      <span>{transaction.rawValue}</span>
-                    </div>
-                    <div className="total-amount">
-                      <span className="label">Total Value:</span>
-                      <span>{formatCurrency(transaction.totalValue)}</span>
-                    </div>
+                  <div className="transaction-info">
+                    <pre>{formatCalculationDisplay(transaction)}</pre>
                   </div>
                 </div>
               </motion.div>

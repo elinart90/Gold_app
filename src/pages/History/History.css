@@ -1,10 +1,12 @@
+/* History.css - Complete Updated Version */
+
 /* Base Styles with Animation Variables */
 :root {
-  --primary-color: #D4AF37;
-  --secondary-color: #1d6f42;
-  --error-color: #d32f2f;
-  --success-color: #388e3c;
-  --info-color: #1976d2;
+  --primary-color: #D4AF37; /* Gold */
+  --secondary-color: #1d6f42; /* Green */
+  --error-color: #d32f2f; /* Red */
+  --success-color: #388e3c; /* Dark Green */
+  --info-color: #1976d2; /* Blue */
   --transition-fast: 0.2s ease;
   --transition-medium: 0.3s ease;
   --transition-slow: 0.5s ease;
@@ -13,6 +15,7 @@
   --shadow-lg: 0 10px 25px rgba(0,0,0,0.1);
 }
 
+/* Layout and Structure */
 .transaction-history {
   max-width: 1200px;
   margin: 0 auto;
@@ -22,7 +25,7 @@
   animation: fadeIn var(--transition-slow);
 }
 
-/* Keyframe Animations */
+/* Animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -61,7 +64,7 @@
   40%, 80% { transform: translateX(5px); }
 }
 
-/* Enhanced Header Styles */
+/* Header Section */
 .history-header {
   display: flex;
   justify-content: space-between;
@@ -118,7 +121,7 @@
   flex-wrap: wrap;
 }
 
-/* Enhanced Filter Section */
+/* Filter Controls */
 .date-filter-container {
   margin-bottom: 1.5rem;
   background: #f8f9fa;
@@ -174,7 +177,7 @@
   box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
 }
 
-/* Enhanced Button Styles */
+/* Buttons */
 .filter-button,
 .refresh-button,
 .export-button,
@@ -280,7 +283,7 @@
   animation: spin 1s linear infinite;
 }
 
-/* Enhanced Summary Card */
+/* Summary Card */
 .total-summary-container {
   margin-bottom: 1.5rem;
   animation: fadeIn 0.6s ease;
@@ -342,7 +345,7 @@
   font-size: 0.8rem;
 }
 
-/* Enhanced Status Bar */
+/* Status Bar */
 .last-refreshed {
   display: flex;
   align-items: center;
@@ -368,7 +371,7 @@
   transform: scale(1.05);
 }
 
-/* Enhanced Transaction List */
+/* Transaction List */
 .transactions-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -465,48 +468,15 @@
   color: #333;
 }
 
-.transaction-amount {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 0.5rem;
+.transaction-info pre {
+  margin: 0;
+  font-family: inherit;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.5;
 }
 
-.transaction-amount > div {
-  display: flex;
-  justify-content: space-between;
-  min-width: 160px;
-  transition: transform var(--transition-fast);
-}
-
-.transaction-card:hover .transaction-amount > div {
-  transform: translateX(5px);
-}
-
-.label {
-  color: #666;
-  font-weight: 500;
-  transition: color var(--transition-fast);
-}
-
-.transaction-card:hover .label {
-  color: var(--primary-color);
-}
-
-.total-amount {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid #eee;
-  font-weight: 600;
-  transition: all var(--transition-fast);
-  grid-column: 1 / -1;
-}
-
-.transaction-card:hover .total-amount {
-  border-color: var(--primary-color);
-  transform: scale(1.02);
-}
-
-/* Enhanced States */
+/* State Indicators */
 .loading-container,
 .empty-state {
   text-align: center;
@@ -573,7 +543,7 @@
   animation: highlight 1.5s ease;
 }
 
-/* Responsive Styles */
+/* Responsive Design */
 @media (max-width: 768px) {
   .transactions-list {
     grid-template-columns: 1fr;
@@ -598,14 +568,6 @@
 @media (max-width: 480px) {
   .transaction-history {
     padding: 1rem;
-  }
-
-  .transaction-amount {
-    grid-template-columns: 1fr;
-  }
-  
-  .transaction-amount > div {
-    min-width: 100%;
   }
 
   .transaction-card {
