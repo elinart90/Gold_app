@@ -12,7 +12,7 @@ import {
   FaFileExcel
 } from 'react-icons/fa';
 import { formatCurrency } from '../../utils/currencyFormatter';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { format, subDays, startOfDay, endOfDay, isAfter, isBefore } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db } from '../../services/firebase';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
@@ -31,6 +31,7 @@ const TransactionHistory = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [startDate, setStartDate] = useState(startOfDay(subDays(new Date(), 30)));
   const [endDate, setEndDate] = useState(endOfDay(new Date()));
+  const [isExporting, setIsExporting] = useState(false);
 
   const transactionVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -65,26 +66,36 @@ const TransactionHistory = () => {
       const q = query(
         collection(db, 'calculations'),
         where('agentId', '==', agentId),
-        where('timestamp', '>=', startDate),
-        where('timestamp', '<=', endDate),
         orderBy('timestamp', 'desc')
       );
 
       const snapshot = await getDocs(q);
 
-      const transactionsData = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        const timestamp = data.timestamp?.toDate?.() || 
-                        new Date(data.timestamp?.seconds * 1000 || Date.now());
+      const transactionsData = snapshot.docs
+        .map((doc) => {
+          const data = doc.data();
+          const timestamp = data.timestamp?.toDate?.() || 
+                          new Date(data.timestamp?.seconds * 1000 || Date.now());
 
-        return {
-          id: doc.id,
-          ...data,
-          timestamp,
-          type: 'calculation',
-          pricePerUnit: data.price
-        };
-      });
+          return {
+            id: doc.id,
+            ...data,
+            timestamp,
+            type: 'calculation',
+            pricePerUnit: data.price,
+            weight: data.weight || 0,
+            totalValue: data.totalValue || 0,
+            effectiveUnits: data.effectiveUnits || 0,
+            blades: data.blades || 0,
+            matches: data.matches || 0,
+            pounds: data.pounds || 0,
+            rawValue: data.rawValue || 0
+          };
+        })
+        .filter(transaction => 
+          isAfter(transaction.timestamp, startDate) && 
+          isBefore(transaction.timestamp, endDate)
+        );
 
       const total = transactionsData.reduce((sum, t) => sum + (t.totalValue || 0), 0);
 
@@ -100,20 +111,32 @@ const TransactionHistory = () => {
   };
 
   const exportToExcel = () => {
-    const dataToExport = transactions.map(transaction => ({
-      'Date': format(transaction.timestamp, 'PPpp'),
-      'Transaction Type': 'Gold Calculation',
-      'Weight (g)': transaction.weight,
-      'Price per Unit': transaction.pricePerUnit,
-      'Units': transaction.effectiveUnits,
-      'Total Value': transaction.totalValue,
-      'Agent': agentName
-    }));
+    setIsExporting(true);
+    try {
+      const dataToExport = transactions.map(transaction => ({
+        'Date': format(transaction.timestamp, 'PPpp'),
+        'Transaction Type': 'Gold Calculation',
+        'Weight (g)': transaction.weight,
+        'Price per Unit': `$${parseFloat(transaction.pricePerUnit).toFixed(2)}`,
+        'Units': transaction.effectiveUnits,
+        'Blades': transaction.blades,
+        'Matches': transaction.matches,
+        'Pounds': transaction.pounds,
+        'Raw Value': transaction.rawValue.toFixed(4),
+        'Total Value': formatCurrency(transaction.totalValue),
+        'Agent': agentName
+      }));
 
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Transactions");
-    XLSX.writeFile(wb, `Gold_Transactions_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Transactions");
+      XLSX.writeFile(wb, `Gold_Transactions_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    } catch (err) {
+      console.error('Export error:', err);
+      setError('Failed to export data');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   useEffect(() => {
@@ -127,11 +150,19 @@ const TransactionHistory = () => {
   const toggleFilters = () => setShowFilters((prev) => !prev);
 
   const handleStartDateChange = (date) => {
-    setStartDate(date ? startOfDay(date) : startOfDay(subDays(new Date(), 30)));
+    const newDate = date ? startOfDay(date) : startOfDay(subDays(new Date(), 30));
+    setStartDate(newDate);
+    if (isAfter(newDate, endDate)) {
+      setEndDate(endOfDay(newDate));
+    }
   };
 
   const handleEndDateChange = (date) => {
-    setEndDate(date ? endOfDay(date) : endOfDay(new Date()));
+    const newDate = date ? endOfDay(date) : endOfDay(new Date());
+    setEndDate(newDate);
+    if (isBefore(newDate, startDate)) {
+      setStartDate(startOfDay(newDate));
+    }
   };
 
   const formatTimestamp = (timestamp) => {
@@ -182,7 +213,7 @@ const TransactionHistory = () => {
             className="export-button"
             disabled={transactions.length === 0 || loading}
           >
-            <FaFileExcel /> Export
+            <FaFileExcel className={isExporting ? 'spinning' : ''} /> Export
           </button>
         </div>
       </div>
@@ -303,19 +334,27 @@ const TransactionHistory = () => {
                   <div className="transaction-amount">
                     <div>
                       <span className="label">Weight:</span>
-                      <span>{transaction.weight || 0}g</span>
+                      <span>{transaction.weight}g</span>
                     </div>
                     <div>
                       <span className="label">Price:</span>
-                      <span>{formatCurrency(transaction.pricePerUnit || 0)}/unit</span>
+                      <span>{formatCurrency(transaction.pricePerUnit)}/unit</span>
                     </div>
                     <div>
                       <span className="label">Units:</span>
-                      <span>{transaction.effectiveUnits || 0}</span>
+                      <span>{transaction.effectiveUnits}</span>
+                    </div>
+                    <div>
+                      <span className="label">Blades:</span>
+                      <span>{transaction.blades}</span>
+                    </div>
+                    <div>
+                      <span className="label">Matches:</span>
+                      <span>{transaction.matches}</span>
                     </div>
                     <div className="total-amount">
                       <span className="label">Total:</span>
-                      <span>{formatCurrency(transaction.totalValue || 0)}</span>
+                      <span>{formatCurrency(transaction.totalValue)}</span>
                     </div>
                   </div>
                 </div>

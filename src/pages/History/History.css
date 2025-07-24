@@ -1,13 +1,46 @@
-/* Base Styles */
+/* Base Styles with Animation Variables */
+:root {
+  --primary-color: #D4AF37;
+  --secondary-color: #1d6f42;
+  --error-color: #d32f2f;
+  --transition-fast: 0.2s ease;
+  --transition-medium: 0.3s ease;
+  --transition-slow: 0.5s ease;
+}
+
 .transaction-history {
   max-width: 1200px;
   margin: 0 auto;
   padding: 1.5rem;
   font-family: 'Segoe UI', Roboto, sans-serif;
   color: #333;
+  animation: fadeIn var(--transition-slow);
 }
 
-/* Header Styles */
+/* Keyframe Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(-20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+@keyframes float {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+  100% { transform: translateY(0); }
+}
+
+/* Enhanced Header Styles with Animation */
 .history-header {
   display: flex;
   justify-content: space-between;
@@ -17,6 +50,7 @@
   gap: 1rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid #eaeaea;
+  animation: slideIn 0.4s ease-out;
 }
 
 .header-title {
@@ -29,6 +63,11 @@
 .header-title h2 {
   margin: 0;
   font-size: 1.5rem;
+  transition: transform var(--transition-fast);
+}
+
+.header-title h2:hover {
+  transform: translateX(5px);
 }
 
 .agent-info {
@@ -42,22 +81,26 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: color var(--transition-fast);
 }
 
-.header-actions {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+.agent-info:hover {
+  color: var(--primary-color);
 }
 
-/* Filter Section */
+/* Enhanced Filter Section with Animation */
 .date-filter-container {
   margin-bottom: 1.5rem;
   background: #f8f9fa;
   border-radius: 0.5rem;
   padding: 1rem;
-  transition: all 0.3s ease;
+  transition: all var(--transition-medium);
   overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.date-filter-container.active {
+  box-shadow: 0 0 0 2px var(--primary-color);
 }
 
 .date-range-picker {
@@ -69,6 +112,7 @@
 .date-picker-group {
   flex: 1;
   min-width: 200px;
+  animation: fadeIn 0.5s ease;
 }
 
 .date-picker-group label {
@@ -77,6 +121,11 @@
   font-size: 0.9rem;
   color: #666;
   font-weight: 500;
+  transition: color var(--transition-fast);
+}
+
+.date-picker-group:hover label {
+  color: var(--primary-color);
 }
 
 .date-input {
@@ -85,16 +134,16 @@
   border: 1px solid #ddd;
   border-radius: 0.375rem;
   font-size: 0.95rem;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
 }
 
 .date-input:focus {
   outline: none;
-  border-color: #D4AF37;
+  border-color: var(--primary-color);
   box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
 }
 
-/* Button Styles */
+/* Enhanced Button Styles with Animation */
 .filter-button,
 .refresh-button,
 .export-button,
@@ -108,7 +157,25 @@
   border-radius: 0.375rem;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
+  transform: translateY(0);
+}
+
+.filter-button:hover,
+.refresh-button:hover,
+.export-button:hover,
+.show-all-button:hover,
+.retry-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.filter-button:active,
+.refresh-button:active,
+.export-button:active,
+.show-all-button:active,
+.retry-button:active {
+  transform: translateY(1px);
 }
 
 .filter-button {
@@ -121,8 +188,9 @@
 }
 
 .filter-button.active {
-  background: #D4AF37;
+  background: var(--primary-color);
   color: white;
+  animation: pulse 1.5s infinite;
 }
 
 .refresh-button {
@@ -136,10 +204,11 @@
 .refresh-button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+  transform: none !important;
 }
 
 .export-button {
-  background: #1d6f42;
+  background: var(--secondary-color);
   color: white;
 }
 
@@ -150,10 +219,11 @@
 .export-button:disabled {
   background: #cccccc;
   cursor: not-allowed;
+  transform: none !important;
 }
 
 .show-all-button {
-  background: #D4AF37;
+  background: var(--primary-color);
   color: white;
 }
 
@@ -176,9 +246,10 @@
   animation: spin 1s linear infinite;
 }
 
-/* Summary Card */
+/* Enhanced Summary Card with Animation */
 .total-summary-container {
   margin-bottom: 1.5rem;
+  animation: fadeIn 0.6s ease;
 }
 
 .total-summary-card {
@@ -189,11 +260,18 @@
   align-items: center;
   gap: 1rem;
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  transition: all var(--transition-medium);
+}
+
+.total-summary-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
 }
 
 .summary-icon {
   font-size: 1.75rem;
-  color: #D4AF37;
+  color: var(--primary-color);
+  animation: float 3s ease-in-out infinite;
 }
 
 .summary-details {
@@ -205,12 +283,22 @@
   font-size: 0.95rem;
   color: #666;
   margin-bottom: 0.25rem;
+  transition: color var(--transition-fast);
+}
+
+.total-summary-card:hover .summary-label {
+  color: var(--primary-color);
 }
 
 .summary-amount {
   font-size: 1.5rem;
   font-weight: 600;
   margin-bottom: 0.25rem;
+  transition: transform var(--transition-fast);
+}
+
+.total-summary-card:hover .summary-amount {
+  transform: scale(1.05);
 }
 
 .date-range {
@@ -218,7 +306,7 @@
   font-size: 0.8rem;
 }
 
-/* Status Bar */
+/* Enhanced Status Bar */
 .last-refreshed {
   display: flex;
   align-items: center;
@@ -235,9 +323,15 @@
   padding: 0.25rem 0.5rem;
   border-radius: 0.375rem;
   font-size: 0.8rem;
+  transition: all var(--transition-fast);
 }
 
-/* Transaction List */
+.results-count:hover {
+  background: var(--primary-color);
+  color: white;
+}
+
+/* Enhanced Transaction List with Animations */
 .transactions-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -249,20 +343,35 @@
   border-radius: 0.5rem;
   padding: 1.25rem;
   box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-  transition: all 0.2s ease;
+  transition: all var(--transition-medium);
   display: flex;
   gap: 1rem;
+  animation: fadeIn 0.5s ease;
+  will-change: transform;
 }
 
 .transaction-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
+
+.transaction-card:nth-child(odd) {
+  animation-delay: 0.1s;
+}
+
+.transaction-card:nth-child(even) {
+  animation-delay: 0.2s;
 }
 
 .transaction-icon {
-  color: #D4AF37;
+  color: var(--primary-color);
   font-size: 1.5rem;
   margin-top: 0.25rem;
+  transition: transform var(--transition-fast);
+}
+
+.transaction-card:hover .transaction-icon {
+  transform: rotate(15deg) scale(1.1);
 }
 
 .transaction-details {
@@ -279,7 +388,12 @@
 
 .transaction-type {
   font-weight: 600;
-  color: #D4AF37;
+  color: var(--primary-color);
+  transition: color var(--transition-fast);
+}
+
+.transaction-card:hover .transaction-type {
+  color: var(--secondary-color);
 }
 
 .transaction-date {
@@ -288,6 +402,11 @@
   gap: 0.25rem;
   font-size: 0.8rem;
   color: #777;
+  transition: color var(--transition-fast);
+}
+
+.transaction-card:hover .transaction-date {
+  color: #333;
 }
 
 .transaction-amount {
@@ -298,11 +417,21 @@
 .transaction-amount > div {
   display: flex;
   justify-content: space-between;
+  transition: transform var(--transition-fast);
+}
+
+.transaction-card:hover .transaction-amount > div {
+  transform: translateX(5px);
 }
 
 .label {
   color: #666;
   font-weight: 500;
+  transition: color var(--transition-fast);
+}
+
+.transaction-card:hover .label {
+  color: var(--primary-color);
 }
 
 .total-amount {
@@ -310,23 +439,31 @@
   padding-top: 0.5rem;
   border-top: 1px solid #eee;
   font-weight: 600;
+  transition: all var(--transition-fast);
 }
 
-/* States */
+.transaction-card:hover .total-amount {
+  border-color: var(--primary-color);
+  transform: scale(1.02);
+}
+
+/* Enhanced States with Animations */
 .loading-container,
 .empty-state {
   text-align: center;
   padding: 2rem;
   color: #666;
   grid-column: 1 / -1;
+  animation: fadeIn var(--transition-medium);
 }
 
 .empty-state p {
   margin-bottom: 1rem;
+  animation: pulse 2s infinite;
 }
 
 .error-message {
-  color: #d32f2f;
+  color: var(--error-color);
   background: #fde8e8;
   padding: 1rem;
   border-radius: 0.375rem;
@@ -335,15 +472,16 @@
   gap: 0.5rem;
   margin-bottom: 1rem;
   flex-wrap: wrap;
+  animation: shake 0.5s ease;
 }
 
-/* Animations */
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
 }
 
-/* Responsive */
+/* Responsive Styles */
 @media (max-width: 768px) {
   .transactions-list {
     grid-template-columns: 1fr;
@@ -368,10 +506,12 @@
 @media (max-width: 480px) {
   .transaction-history {
     padding: 1rem;
+    animation: none;
   }
 
   .transaction-card {
     flex-direction: column;
+    animation: slideIn 0.4s ease;
   }
 
   .filter-button, 
@@ -394,4 +534,14 @@
   .header-actions {
     gap: 0.5rem;
   }
+}
+
+/* Additional Micro-Interactions */
+@keyframes highlight {
+  from { background-color: rgba(212, 175, 55, 0.1); }
+  to { background-color: transparent; }
+}
+
+.new-transaction {
+  animation: highlight 1.5s ease;
 }
