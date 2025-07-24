@@ -8,7 +8,8 @@ import {
   FaSync,
   FaExclamationTriangle,
   FaFilter,
-  FaMoneyBillWave
+  FaMoneyBillWave,
+  FaFileExcel
 } from 'react-icons/fa';
 import { formatCurrency } from '../../utils/currencyFormatter';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
@@ -16,15 +17,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { db } from '../../services/firebase';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import DatePicker from 'react-datepicker';
+import * as XLSX from 'xlsx';
 import 'react-datepicker/dist/react-datepicker.css';
 import './History.css';
 
 const TransactionHistory = () => {
   const { agentId, agentName } = useGoldPrice();
   const [transactions, setTransactions] = useState([]);
-  const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [totalSpent, setTotalSpent] = useState(0);
-  const [filteredTotal, setFilteredTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
@@ -65,6 +65,8 @@ const TransactionHistory = () => {
       const q = query(
         collection(db, 'calculations'),
         where('agentId', '==', agentId),
+        where('timestamp', '>=', startDate),
+        where('timestamp', '<=', endDate),
         orderBy('timestamp', 'desc')
       );
 
@@ -72,9 +74,8 @@ const TransactionHistory = () => {
 
       const transactionsData = snapshot.docs.map((doc) => {
         const data = doc.data();
-        const timestamp = data.timestamp?.toDate?.()
-          ? data.timestamp.toDate()
-          : new Date(data.timestamp?.seconds ? data.timestamp.seconds * 1000 : Date.now());
+        const timestamp = data.timestamp?.toDate?.() || 
+                        new Date(data.timestamp?.seconds * 1000 || Date.now());
 
         return {
           id: doc.id,
@@ -85,46 +86,42 @@ const TransactionHistory = () => {
         };
       });
 
+      const total = transactionsData.reduce((sum, t) => sum + (t.totalValue || 0), 0);
+
       setTransactions(transactionsData);
-      applyDateFilter(transactionsData, startDate, endDate);
+      setTotalSpent(total);
+      setLastRefreshed(new Date());
     } catch (err) {
       console.error('Error fetching transactions:', err);
-      setError('Failed to load calculations');
+      setError(`Failed to load calculations: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
-  const applyDateFilter = (transactionsToFilter, start, end) => {
-    const filtered = transactionsToFilter.filter((transaction) => {
-      const transactionDate = transaction.timestamp;
-      return (
-        transactionDate >= start &&
-        transactionDate <= end
-      );
-    });
+  const exportToExcel = () => {
+    const dataToExport = transactions.map(transaction => ({
+      'Date': format(transaction.timestamp, 'PPpp'),
+      'Transaction Type': 'Gold Calculation',
+      'Weight (g)': transaction.weight,
+      'Price per Unit': transaction.pricePerUnit,
+      'Units': transaction.effectiveUnits,
+      'Total Value': transaction.totalValue,
+      'Agent': agentName
+    }));
 
-    const total = filtered.reduce((sum, t) => sum + (t.totalValue || 0), 0);
-
-    setFilteredTransactions(filtered);
-    setFilteredTotal(total);
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Transactions");
+    XLSX.writeFile(wb, `Gold_Transactions_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   };
 
   useEffect(() => {
     fetchTransactions();
-    setLastRefreshed(new Date());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentId]);
-
-  useEffect(() => {
-    if (transactions.length > 0) {
-      applyDateFilter(transactions, startDate, endDate);
-    }
-  }, [startDate, endDate, transactions]);
+  }, [agentId, startDate, endDate]);
 
   const handleRefresh = () => {
     fetchTransactions();
-    setLastRefreshed(new Date());
   };
 
   const toggleFilters = () => setShowFilters((prev) => !prev);
@@ -173,8 +170,19 @@ const TransactionHistory = () => {
           <button onClick={toggleFilters} className="filter-button">
             <FaFilter /> {showFilters ? 'Hide Filters' : 'Filter'}
           </button>
-          <button onClick={handleRefresh} className="refresh-button" disabled={loading}>
+          <button 
+            onClick={handleRefresh} 
+            className="refresh-button" 
+            disabled={loading}
+          >
             <FaSync className={loading ? 'spinning' : ''} /> Refresh
+          </button>
+          <button 
+            onClick={exportToExcel}
+            className="export-button"
+            disabled={transactions.length === 0 || loading}
+          >
+            <FaFileExcel /> Export
           </button>
         </div>
       </div>
@@ -226,7 +234,7 @@ const TransactionHistory = () => {
           <FaMoneyBillWave className="summary-icon" />
           <div className="summary-details">
             <span className="summary-label">Total Spent</span>
-            <span className="summary-amount">{formatCurrency(filteredTotal)}</span>
+            <span className="summary-amount">{formatCurrency(totalSpent)}</span>
             <small className="date-range">{formatDateRange(startDate, endDate)}</small>
           </div>
         </div>
@@ -235,14 +243,19 @@ const TransactionHistory = () => {
       <div className="last-refreshed">
         Last updated: {format(lastRefreshed, 'PPpp')}
         {loading && ' (Loading...)'}
-        {!loading && filteredTransactions.length > 0 && (
-          <span className="results-count">Showing {filteredTransactions.length} records</span>
+        {transactions.length > 0 && (
+          <span className="results-count">
+            Showing {transactions.length} records
+          </span>
         )}
       </div>
 
       {error && (
         <div className="error-message">
           <FaExclamationTriangle /> {error}
+          <button onClick={fetchTransactions} className="retry-button">
+            Retry
+          </button>
         </div>
       )}
 
@@ -250,7 +263,7 @@ const TransactionHistory = () => {
         <div className="loading-container">
           <p>Loading calculations...</p>
         </div>
-      ) : filteredTransactions.length === 0 ? (
+      ) : transactions.length === 0 ? (
         <div className="empty-state">
           <p>No calculations found for selected date range</p>
           <button
@@ -266,7 +279,7 @@ const TransactionHistory = () => {
       ) : (
         <div className="transactions-list">
           <AnimatePresence>
-            {filteredTransactions.map((transaction) => (
+            {transactions.map((transaction) => (
               <motion.div
                 key={transaction.id}
                 className="transaction-card"
