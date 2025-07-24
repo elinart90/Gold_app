@@ -37,6 +37,10 @@
   font-size: 0.9rem;
   color: #666;
   margin-left: 1rem;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .header-actions {
@@ -52,6 +56,10 @@
   border-radius: 0.5rem;
   padding: 1rem;
   transition: all 0.3s ease;
+}
+
+.date-filter-container.active {
+  border: 1px solid #D4AF37;
 }
 
 .date-range-picker {
@@ -330,5 +338,14 @@
 
   .date-range-input {
     width: 100%;
+  }
+
+  .total-summary-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .summary-details {
+    align-items: flex-start;
   }
 }

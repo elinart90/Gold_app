@@ -32,8 +32,7 @@ const TransactionHistory = () => {
     endOfDay(new Date())
   ]);
 
-  const startDate = dateRange[0];
-  const endDate = dateRange[1];
+  const [startDate, endDate] = dateRange;
 
   const transactionVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -46,8 +45,11 @@ const TransactionHistory = () => {
   };
 
   const formatDateRange = (start, end) => {
+    if (!start || !end) return 'Invalid range';
     if (start.getTime() === end.getTime()) return format(start, 'MMMM d, yyyy');
-    if (start.getFullYear() === end.getFullYear()) return `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`;
+    if (start.getFullYear() === end.getFullYear()) {
+      return `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`;
+    }
     return `${format(start, 'MMM d, yyyy')} - ${format(end, 'MMM d, yyyy')}`;
   };
 
@@ -59,6 +61,8 @@ const TransactionHistory = () => {
     }
 
     setLoading(true);
+    setError(null);
+
     try {
       const q = query(
         collection(db, 'calculations'),
@@ -69,11 +73,13 @@ const TransactionHistory = () => {
       );
 
       const snapshot = await getDocs(q);
+
       const transactionsData = snapshot.docs.map((doc) => {
         const data = doc.data();
-        const timestamp =
-          data.timestamp?.toDate?.() ||
-          (data.timestamp?.seconds ? new Date(data.timestamp.seconds * 1000) : new Date());
+        const timestamp = data.timestamp?.toDate?.()
+          ? data.timestamp.toDate()
+          : new Date(data.timestamp?.seconds ? data.timestamp.seconds * 1000 : Date.now());
+
         return {
           id: doc.id,
           ...data,
@@ -83,19 +89,22 @@ const TransactionHistory = () => {
         };
       });
 
+      const total = transactionsData.reduce((sum, t) => sum + (t.totalValue || 0), 0);
+
       setTransactions(transactionsData);
-      setTotalSpent(transactionsData.reduce((sum, t) => sum + (t.totalValue || 0), 0));
-      setError(null);
+      setTotalSpent(total);
     } catch (err) {
       console.error('Error fetching transactions:', err);
       setError('Failed to load calculations');
     }
+
     setLoading(false);
   };
 
   useEffect(() => {
     fetchTransactions();
     setLastRefreshed(new Date());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentId, startDate, endDate]);
 
   const handleRefresh = () => {
@@ -103,7 +112,7 @@ const TransactionHistory = () => {
     setLastRefreshed(new Date());
   };
 
-  const toggleFilters = () => setShowFilters(!showFilters);
+  const toggleFilters = () => setShowFilters((prev) => !prev);
 
   const handleDateChange = (dates) => {
     const [start, end] = dates;
@@ -114,7 +123,6 @@ const TransactionHistory = () => {
   };
 
   const formatTimestamp = (timestamp) => {
-    if (!timestamp) return 'Unknown date';
     try {
       const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
       return format(date, 'PPpp');
@@ -196,7 +204,7 @@ const TransactionHistory = () => {
       <div className="last-refreshed">
         Last updated: {format(lastRefreshed, 'PPpp')}
         {loading && ' (Loading...)'}
-        {transactions.length > 0 && (
+        {!loading && transactions.length > 0 && (
           <span className="results-count">Showing {transactions.length} records</span>
         )}
       </div>
