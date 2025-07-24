@@ -56,6 +56,7 @@
   border-radius: 0.5rem;
   padding: 1rem;
   transition: all 0.3s ease;
+  overflow: hidden;
 }
 
 .date-filter-container.active {
@@ -64,22 +65,39 @@
 
 .date-range-picker {
   display: flex;
-  justify-content: center;
+  gap: 1rem;
 }
 
-.date-range-input {
+.date-picker-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.date-picker-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.date-input {
+  width: 100%;
   padding: 0.75rem;
   border: 1px solid #ddd;
   border-radius: 0.375rem;
   font-size: 0.95rem;
-  text-align: center;
-  width: 100%;
-  max-width: 280px;
+  transition: border-color 0.2s;
+}
+
+.date-input:focus {
+  outline: none;
+  border-color: #D4AF37;
 }
 
 /* Button Styles */
 .filter-button,
-.refresh-button {
+.refresh-button,
+.export-button {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -89,12 +107,14 @@
   font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+.filter-button {
   background: #f1f3f5;
   color: #333;
 }
 
-.filter-button:hover,
-.refresh-button:hover {
+.filter-button:hover {
   background: #e1e4e7;
 }
 
@@ -103,14 +123,31 @@
   color: white;
 }
 
+.refresh-button {
+  background: #f1f3f5;
+}
+
+.refresh-button:hover {
+  background: #e1e4e7;
+}
+
 .refresh-button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
 }
 
-.refresh-button.loading {
-  pointer-events: none;
-  opacity: 0.6;
+.export-button {
+  background: #1d6f42;
+  color: white;
+}
+
+.export-button:hover {
+  background: #165a35;
+}
+
+.export-button:disabled {
+  background: #cccccc;
+  cursor: not-allowed;
 }
 
 .spinning {
@@ -264,11 +301,6 @@
   margin-bottom: 1rem;
 }
 
-.no-results {
-  color: #999;
-  font-style: italic;
-}
-
 .error-message {
   color: #d32f2f;
   background: #fde8e8;
@@ -285,7 +317,6 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  margin-top: 1rem;
   border: none;
   border-radius: 0.375rem;
   background: #D4AF37;
@@ -319,6 +350,11 @@
     width: 100%;
     justify-content: space-between;
   }
+
+  .date-range-picker {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
 }
 
 @media (max-width: 480px) {
@@ -331,13 +367,10 @@
   }
 
   .filter-button, 
-  .refresh-button {
+  .refresh-button,
+  .export-button {
     padding: 0.5rem;
     font-size: 0.8rem;
-  }
-
-  .date-range-input {
-    width: 100%;
   }
 
   .total-summary-card {

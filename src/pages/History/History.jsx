@@ -22,17 +22,15 @@ import './History.css';
 const TransactionHistory = () => {
   const { agentId, agentName } = useGoldPrice();
   const [transactions, setTransactions] = useState([]);
+  const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [totalSpent, setTotalSpent] = useState(0);
+  const [filteredTotal, setFilteredTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
   const [showFilters, setShowFilters] = useState(false);
-  const [dateRange, setDateRange] = useState([
-    startOfDay(subDays(new Date(), 30)),
-    endOfDay(new Date())
-  ]);
-
-  const [startDate, endDate] = dateRange;
+  const [startDate, setStartDate] = useState(startOfDay(subDays(new Date(), 30)));
+  const [endDate, setEndDate] = useState(endOfDay(new Date()));
 
   const transactionVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -67,8 +65,6 @@ const TransactionHistory = () => {
       const q = query(
         collection(db, 'calculations'),
         where('agentId', '==', agentId),
-        where('timestamp', '>=', startDate),
-        where('timestamp', '<=', endDate),
         orderBy('timestamp', 'desc')
       );
 
@@ -89,10 +85,8 @@ const TransactionHistory = () => {
         };
       });
 
-      const total = transactionsData.reduce((sum, t) => sum + (t.totalValue || 0), 0);
-
       setTransactions(transactionsData);
-      setTotalSpent(total);
+      applyDateFilter(transactionsData, startDate, endDate);
     } catch (err) {
       console.error('Error fetching transactions:', err);
       setError('Failed to load calculations');
@@ -101,11 +95,32 @@ const TransactionHistory = () => {
     setLoading(false);
   };
 
+  const applyDateFilter = (transactionsToFilter, start, end) => {
+    const filtered = transactionsToFilter.filter((transaction) => {
+      const transactionDate = transaction.timestamp;
+      return (
+        transactionDate >= start &&
+        transactionDate <= end
+      );
+    });
+
+    const total = filtered.reduce((sum, t) => sum + (t.totalValue || 0), 0);
+
+    setFilteredTransactions(filtered);
+    setFilteredTotal(total);
+  };
+
   useEffect(() => {
     fetchTransactions();
     setLastRefreshed(new Date());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentId, startDate, endDate]);
+  }, [agentId]);
+
+  useEffect(() => {
+    if (transactions.length > 0) {
+      applyDateFilter(transactions, startDate, endDate);
+    }
+  }, [startDate, endDate, transactions]);
 
   const handleRefresh = () => {
     fetchTransactions();
@@ -114,12 +129,12 @@ const TransactionHistory = () => {
 
   const toggleFilters = () => setShowFilters((prev) => !prev);
 
-  const handleDateChange = (dates) => {
-    const [start, end] = dates;
-    setDateRange([
-      start ? startOfDay(start) : startOfDay(subDays(new Date(), 30)),
-      end ? endOfDay(end) : endOfDay(new Date())
-    ]);
+  const handleStartDateChange = (date) => {
+    setStartDate(date ? startOfDay(date) : startOfDay(subDays(new Date(), 30)));
+  };
+
+  const handleEndDateChange = (date) => {
+    setEndDate(date ? endOfDay(date) : endOfDay(new Date()));
   };
 
   const formatTimestamp = (timestamp) => {
@@ -174,17 +189,33 @@ const TransactionHistory = () => {
             transition={{ duration: 0.3 }}
           >
             <div className="date-range-picker">
-              <DatePicker
-                selectsRange
-                startDate={startDate}
-                endDate={endDate}
-                onChange={handleDateChange}
-                maxDate={new Date()}
-                isClearable
-                placeholderText="Select date range"
-                className="date-range-input"
-                dateFormat="MMMM d, yyyy"
-              />
+              <div className="date-picker-group">
+                <label>Start Date</label>
+                <DatePicker
+                  selected={startDate}
+                  onChange={handleStartDateChange}
+                  selectsStart
+                  startDate={startDate}
+                  endDate={endDate}
+                  maxDate={endDate}
+                  className="date-input"
+                  dateFormat="MMMM d, yyyy"
+                />
+              </div>
+              <div className="date-picker-group">
+                <label>End Date</label>
+                <DatePicker
+                  selected={endDate}
+                  onChange={handleEndDateChange}
+                  selectsEnd
+                  startDate={startDate}
+                  endDate={endDate}
+                  minDate={startDate}
+                  maxDate={new Date()}
+                  className="date-input"
+                  dateFormat="MMMM d, yyyy"
+                />
+              </div>
             </div>
           </motion.div>
         )}
@@ -195,7 +226,7 @@ const TransactionHistory = () => {
           <FaMoneyBillWave className="summary-icon" />
           <div className="summary-details">
             <span className="summary-label">Total Spent</span>
-            <span className="summary-amount">{formatCurrency(totalSpent)}</span>
+            <span className="summary-amount">{formatCurrency(filteredTotal)}</span>
             <small className="date-range">{formatDateRange(startDate, endDate)}</small>
           </div>
         </div>
@@ -204,8 +235,8 @@ const TransactionHistory = () => {
       <div className="last-refreshed">
         Last updated: {format(lastRefreshed, 'PPpp')}
         {loading && ' (Loading...)'}
-        {!loading && transactions.length > 0 && (
-          <span className="results-count">Showing {transactions.length} records</span>
+        {!loading && filteredTransactions.length > 0 && (
+          <span className="results-count">Showing {filteredTransactions.length} records</span>
         )}
       </div>
 
@@ -219,16 +250,14 @@ const TransactionHistory = () => {
         <div className="loading-container">
           <p>Loading calculations...</p>
         </div>
-      ) : transactions.length === 0 ? (
+      ) : filteredTransactions.length === 0 ? (
         <div className="empty-state">
           <p>No calculations found for selected date range</p>
           <button
-            onClick={() =>
-              setDateRange([
-                startOfDay(subDays(new Date(), 365)),
-                endOfDay(new Date())
-              ])
-            }
+            onClick={() => {
+              setStartDate(startOfDay(subDays(new Date(), 365)));
+              setEndDate(endOfDay(new Date()));
+            }}
             className="show-all-button"
           >
             Show Last Year's Transactions
@@ -237,7 +266,7 @@ const TransactionHistory = () => {
       ) : (
         <div className="transactions-list">
           <AnimatePresence>
-            {transactions.map((transaction) => (
+            {filteredTransactions.map((transaction) => (
               <motion.div
                 key={transaction.id}
                 className="transaction-card"
