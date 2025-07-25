@@ -1,5 +1,3 @@
-i have a problem in the history file too, the filter is not working
-
 import { useState, useEffect } from 'react';
 import { useGoldPrice } from '../../contexts/GoldPriceContext';
 import { 
@@ -284,7 +282,7 @@ const TransactionHistory = () => {
         </div>
       )}
     </div>
-  );
+  )
 };
 
 export default TransactionHistory;
